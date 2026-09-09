@@ -1,0 +1,83 @@
+# master_resume.example.yaml
+# ---------------------------------------------------------------------------
+# TEMPLATE. Copy to `master_resume.yaml` and replace every value with your own
+# real facts:
+#
+#     cp master_resume.example.yaml master_resume.yaml
+#
+# `master_resume.yaml` is git-ignored on purpose — it holds your name, email,
+# links and location, and belongs on your machine, not in a public repo.
+#
+# OVER-COMPLETE store of REAL facts only. The tailor tool selects, reorders,
+# and lightly rephrases from this file and NEVER invents. The richer and more
+# truthful this file is, the sharper each tailored resume can be.
+# Add more bullets than any one resume needs; the tailor trims per posting.
+#
+# Any bullet containing a TODO(...) placeholder is ignored by the tailor, so
+# you can leave reminders to yourself in here safely.
+# ---------------------------------------------------------------------------
+
+contact:
+  name: "Your Name"
+  email: "you@example.com"
+  portfolio: "https://example.com"
+  github: "https://github.com/your-handle"
+  linkedin: "https://www.linkedin.com/in/your-handle"
+  location: "City, Region, Country"
+  # State work authorization plainly if it helps for cross-border roles.
+  work_authorization: "e.g. Citizen of X; eligible to work in Y."
+
+summary: >
+  Two or three sentences: your program or current role, the kind of systems you
+  ship, and what you are looking for. Keep it factual — the tailor may rephrase
+  this but will never add claims that are not here.
+
+education:
+  - school: "Your University"
+    location: "City, Region"
+    degree: "Your Degree Program"
+    end: "Expected Month Year"
+    coursework:
+      - "Relevant Course One"
+      - "Relevant Course Two"
+
+skills:
+  languages: [Python, JavaScript]
+  frameworks: [React, FastAPI]
+  databases: [PostgreSQL]
+  tools_cloud: [Git, Docker, "CI/CD"]
+  spoken_languages: ["English (fluent)"]
+
+projects:
+  - name: "Project Name"
+    stack: [Python, FastAPI, React]
+    deployed: "https://example.com/your-project"
+    bullets:
+      - "What it does and who it is for, in one concrete sentence."
+      - "A quantified result where you have one — real numbers only (e.g. cut image size 83%, 5.7GB to under 1GB)."
+      - "A specific technical decision and why you made it."
+
+  - name: "Second Project (in progress)"
+    stack: ["Next.js", MongoDB]
+    status: "in progress"
+    bullets:
+      - "One line on the problem it solves."
+      - "TODO(add concrete features once built — keep it truthful)."
+
+experience:
+  - company: "Employer Name"
+    role: "Your Title"
+    location: "City, Region"
+    start: "Month Year"
+    end: "Month Year"
+    bullets:
+      - "An accomplishment with a real, verifiable metric attached."
+      - "A collaboration or communication result — who you worked with and what changed."
+
+extras:
+  awards:
+    - "Award or title, organization, month year."
+  award_details:
+    - "One line of context on what earning it required."
+  activities:
+    - "An activity worth mentioning."

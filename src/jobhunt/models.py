@@ -1,0 +1,121 @@
+"""Pydantic data models shared across the scanner and tailor."""
+
+from __future__ import annotations
+
+from datetime import datetime
+
+from pydantic import BaseModel, Field
+
+
+class Job(BaseModel):
+    """A single posting normalized across every ATS adapter."""
+
+    source: str  # "greenhouse" | "lever" | "ashby" | "workday" | ...
+    company: str
+    external_id: str
+    title: str
+    location: str | None = None
+    department: str | None = None
+    employment_type: str | None = None
+    url: str
+    description: str | None = None  # plaintext, truncated ~2000 chars
+    posted_at: datetime | None = None
+    # Human-readable relative posting note for sources that expose no exact
+    # timestamp (e.g. Workday's "Posted Today" / "Posted 3 Days Ago").
+    posted_note: str | None = None
+
+    @property
+    def uid(self) -> str:
+        """Stable identity used for dedupe in the seen-store."""
+        return f"{self.source}:{self.company}:{self.external_id}"
+
+
+class MatchResult(BaseModel):
+    """Outcome of matching a job against my criteria."""
+
+    is_match: bool
+    score: int = Field(ge=0, le=100)  # 0-100
+    reason: str
+    location_tier: int  # 1 (best) .. 5 (none); set by matcher
+    company_priority: int  # 1 (top) .. 4 (default); from the priority dict
+
+
+class CompanyConfig(BaseModel):
+    """A watchlist entry, enriched by the loader and `discover`."""
+
+    name: str
+    priority: int = 4  # populated at load from company_priorities
+    ats: str | None = None  # populated by discover
+    slug: str | None = None  # greenhouse/lever/ashby board token
+    tenant: str | None = None  # workday
+    wd: str | None = None  # workday host, e.g. "wd5"
+    site: str | None = None  # workday site
+
+
+class Criteria(BaseModel):
+    """Title/location filtering rules from config.yaml."""
+
+    internship_terms: list[str]  # title must contain >=1
+    role_terms: list[str]  # title must contain >=1
+    exclude_terms: list[str] = []  # title must contain none
+    location_match_required: bool = True
+    use_llm_filter: bool = True
+    # Only notify on postings whose own timestamp is within this many minutes.
+    # None/0 disables the timestamp filter (rely on the seen-store alone).
+    # Sources without a reliable timestamp (Workday; Greenhouse gives edit-time)
+    # are always included — the seen-store guarantees "new since last scan".
+    freshness_minutes: float | None = None
+
+
+class AppConfig(BaseModel):
+    """Fully-resolved application configuration."""
+
+    criteria: Criteria
+    location_tiers: dict[str, list[str]]  # ordered; index = priority
+    company_priorities: dict[int, list[str]]
+    companies: list[CompanyConfig]
+    # built by the loader: name -> tier (default 4)
+    company_priority: dict[str, int] = {}
+    # spend/rate safeguards; overridable via a `budget:` block in config.yaml
+    budget: "BudgetConfig | None" = None
+    # request pacing / politeness; overridable via a `politeness:` block
+    politeness: "PolitenessConfig | None" = None
+    # nightly quiet window; overridable via a `schedule:` block
+    schedule: "ScheduleConfig | None" = None
+
+
+class ScheduleConfig(BaseModel):
+    """A nightly quiet window during which scheduled scans self-skip.
+
+    Times are in `quiet_tz` (an IANA name, so DST is handled), letting you think
+    in one timezone regardless of the machine's local time. Wraps past midnight.
+    """
+
+    enabled: bool = True
+    quiet_start: str = "21:00"  # HH:MM in quiet_tz
+    quiet_end: str = "02:00"
+    quiet_tz: str = "America/New_York"
+    max_run_seconds: int = 1200  # hard watchdog: force-exit a scan that runs longer (catches sleep-stalled network hangs that block the next scheduled run)
+
+
+class PolitenessConfig(BaseModel):
+    """Request pacing so scans spread load and look less machine-like.
+
+    These reduce load spikes on shared hosts (and any throttling risk). They do
+    not disguise the tool — the User-Agent stays honest and descriptive.
+    """
+
+    enabled: bool = True
+    # random sleep between each company fetch (seconds)
+    company_delay_min: float = 0.8
+    company_delay_max: float = 3.0
+    # random sleep at the start of each scheduled scan (seconds); de-syncs runs
+    startup_jitter_seconds: float = 60.0
+    # shuffle companies within each priority tier each run (tiers still ordered)
+    shuffle_within_tier: bool = True
+
+
+# Imported here (not at top) to avoid a cycle: budget.py has no model deps.
+from .budget import BudgetConfig  # noqa: E402
+
+AppConfig.model_rebuild()
