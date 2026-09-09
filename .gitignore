@@ -1,0 +1,33 @@
+# secrets — never commit
+.env
+
+# personal data — the real resume is PII (name, email, links, location).
+# Ship master_resume.example.yaml instead; `jobhunt init` scaffolds a blank one.
+master_resume.yaml
+
+# seen-store: 36k+ rows of personal job-search history (what matched, scores,
+# per-posting model reasoning). Keep it local — publishing it publishes the hunt.
+jobhunt.db
+jobhunt.db.bak-*
+
+# local spend/usage ledger — never commit (reveals usage, keeps caps machine-local)
+.jobhunt_usage.db
+
+# runtime artifacts — may capture webhook URLs or posting text in error output
+logs/
+*.log
+
+# generated
+companies.resolved.yaml
+unresolved.txt
+applications/
+
+# python
+__pycache__/
+*.pyc
+.pytest_cache/
+*.egg-info/
+build/
+dist/
+.venv/
+venv/

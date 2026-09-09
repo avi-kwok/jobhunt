@@ -1,0 +1,490 @@
+# config.yaml
+# ---------------------------------------------------------------------------
+# Scanner configuration. Internships/co-ops ONLY.
+#
+# Companies are listed by NAME. Run `jobhunt discover` to resolve each to its
+# ATS type + board slug (writes companies.resolved.yaml). Slugs are NOT
+# hand-filled here because guessing 350 of them would produce dead endpoints.
+# ---------------------------------------------------------------------------
+
+criteria:
+  # Distilled from the full title list into token matching (substring, case-
+  # insensitive). This is deliberately more robust than exact-title matching:
+  # it also catches "Software Engineering Intern – Summer 2026", etc.
+
+  # TITLE must contain at least one of these (it's an internship/co-op/student role):
+  # "student"/"campus" added for Canadian bank & co-op wording (e.g. RBC's
+  # "Fall Student Opportunities Technology"); role_terms + exclude_terms + the LLM
+  # filter keep precision high.
+  internship_terms: [intern, internship, "co-op", coop, "co op", student, campus]
+
+  # TITLE must contain at least one of these (it's a SWE/dev/infra/security role):
+  role_terms:
+    - software engineer
+    - software developer
+    - software development
+    - sde
+    - swe
+    - computer science
+    - full stack
+    - full-stack
+    - fullstack
+    - backend
+    - back-end
+    - back end
+    - frontend
+    - front-end
+    - front end
+    - platform engineer
+    - infrastructure engineer
+    - cloud engineer
+    - cloud developer
+    - devops
+    - dev ops
+    - site reliability
+    - sre
+    - systems engineer
+    - systems software
+    - application developer
+    - application software
+    - developer tools
+    - developer productivity
+    - developer experience
+    - automation engineer
+    - integration engineer
+    - api engineer
+    - api developer
+    - data engineer
+    - data engineering
+    - database engineer
+    - distributed systems
+    - security engineer
+    - security engineering
+    - application security
+    - appsec
+    - devsecops
+    - production engineer
+    - release engineer
+    - build engineer
+    - technology analyst   # bank early-career dev-track title (e.g. TD/RBC)
+
+  # TITLE containing any of these is rejected (keeps it internship-level SWE):
+  exclude_terms:
+    - senior
+    - staff
+    - principal
+    - manager
+    - director
+    - " lead"          # leading space avoids matching e.g. "Leadership Program"
+    - new grad
+    - new graduate
+    - phd
+    - ph.d
+    - mba
+    - full-time        # tune: remove if it drops valid "full-time internship" posts
+
+  # Cheap Haiku relevance check on survivors of the above (recommended: keeps
+  # borderline titles honest and reads the description for term length, etc.).
+  use_llm_filter: true
+
+  # FRESHNESS. Only notify on postings whose own timestamp is within this many
+  # minutes. 60 comfortably covers the scan cadence (every 15-30 min) so a job
+  # posted between scans is still caught, even if a run is missed. Paired with
+  # the seen-store (dedupe), so nothing is ever notified twice. Sources without a
+  # reliable timestamp (Workday; Greenhouse reports edit-time) are always included
+  # and rely on the seen-store's "new since last scan" guarantee. Set to null/0 to
+  # disable and use the seen-store alone.
+  freshness_minutes: 360
+
+# ---------------------------------------------------------------------------
+# SPEND + RATE SAFEGUARDS. These hard-cap paid API usage so the key can never be
+# used uncontrolled. Every LLM call is gated by these limits and its real token
+# cost is logged to a local, git-ignored .jobhunt_usage.db. When a cap is hit,
+# the run stops instead of spending more (postings are picked up next run).
+# Inspect with `jobhunt budget`; audit key protections with `jobhunt security-check`.
+# ---------------------------------------------------------------------------
+budget:
+  daily_usd: 0.50          # hard ceiling per calendar day (UTC)
+  monthly_usd: 5.00        # hard ceiling per calendar month (UTC)
+  max_calls_per_run: 60    # no single scan can exceed this many API calls
+  min_seconds_between_calls: 0.4   # throttle: no uncontrolled back-to-back calls
+  max_consecutive_errors: 3        # circuit breaker: stop after repeated failures
+  haiku_max_tokens: 256    # per-call output ceiling for the matcher
+  sonnet_max_tokens: 4096  # per-call output ceiling for the tailor
+  enabled: true            # set false only to disable the guard (not recommended)
+
+# ---------------------------------------------------------------------------
+# POLITENESS / REQUEST PACING. Spreads load on shared hosts and reduces any
+# throttling risk. This paces requests — it does NOT disguise the tool; the
+# User-Agent stays honest and descriptive.
+# ---------------------------------------------------------------------------
+politeness:
+  enabled: true
+  company_delay_min: 0.8       # random pause between company fetches (seconds)
+  company_delay_max: 3.0
+  startup_jitter_seconds: 60   # random delay at the start of each scheduled scan
+  shuffle_within_tier: true    # vary company order per run (tiers still ordered)
+
+# ---------------------------------------------------------------------------
+# NIGHTLY QUIET WINDOW. Scheduled scans self-skip during these hours (the agents
+# still fire, but the scan exits immediately — no fetches, no spend). Times are in
+# quiet_tz (IANA name, DST-aware) so you can think in one timezone. `jobhunt scan
+# --force` overrides; seeding is never blocked.
+# ---------------------------------------------------------------------------
+schedule:
+  enabled: false                   # false = scan 24/7 (quiet hours OFF, 2026-07-10) — also
+                                   # closes the overnight-miss gap (8h quiet > 6h freshness)
+  quiet_start: "21:00"             # 9:00 PM  (ignored while enabled: false)
+  quiet_end: "05:00"               # 5:00 AM  (ignored while enabled: false)
+  quiet_tz: "America/Los_Angeles"  # Pacific (PST/PDT), DST-aware
+  max_run_seconds: 0               # 0 = watchdog OFF (a legit full/priority scan can run ~15-20 min and must not be force-killed)
+
+# Location ranking. Matches are sorted by tier (1 = highest priority). A match
+# is still reported if it hits none — it just sorts last. Substring, lowercase.
+location_tiers:
+  tier_1_local:            # Vancouver / Toronto first
+    [vancouver, toronto]
+  tier_2_us_metros:        # major US cities & tech hubs
+    [san francisco, "new york", nyc, seattle, "los angeles", boston, austin,
+     chicago, "palo alto", "mountain view", "san jose", "santa clara", "menlo park",
+     sunnyvale, redmond, "bellevue", denver, atlanta, "washington", "bay area",
+     cupertino, "san diego", irvine, dallas, houston, raleigh, durham, pittsburgh,
+     phoenix, tempe, portland, "salt lake city", boulder, minneapolis, philadelphia,
+     nashville, miami, reston, "san antonio", detroit, "ann arbor"]
+  tier_3_rest_of_canada:
+    [canada, montreal, ottawa, calgary, waterloo, kitchener, edmonton, halifax,
+     "quebec", winnipeg, victoria, "british columbia", ontario]
+  tier_4_remote:
+    [remote]
+
+# ---------------------------------------------------------------------------
+# COMPANY PRIORITY. Grouped lists (human-friendly to edit); the loader inverts
+# these into a name -> priority dict for O(1) lookup. Tier 1 = highest. Any
+# company in the watchlist NOT listed here defaults to priority 4 (still
+# tracked, just sorted last). Names match the canonical watchlist below; three
+# aliases were translated: TD Bank -> TD, Susquehanna International Group -> SIG,
+# Ontario Teachers' Pension Plan -> OTPP.
+# ---------------------------------------------------------------------------
+company_priorities:
+  1:   # TOP PRIORITY
+    [TD, Autodesk, RBC, CIBC, BMO, Magnet Forensics,
+     Google, Microsoft, Amazon, Apple, Meta, NVIDIA, Stripe, Databricks,
+     Cloudflare, Snowflake, Palantir, Bloomberg, Shopify, Airbnb, Uber, Block,
+     LinkedIn, Netflix, Atlassian, Salesforce, ServiceNow, Adobe, Datadog,
+     MongoDB, Confluent, GitHub, Figma, Notion, DoorDash, Coinbase, Plaid,
+     Robinhood, Intuit, Capital One, JPMorgan Chase, Goldman Sachs,
+     Morgan Stanley, BlackRock, Visa, Mastercard, PayPal, Jane Street, Citadel,
+     Citadel Securities, Two Sigma, Hudson River Trading, Jump Trading,
+     IMC Trading, Optiver, D. E. Shaw]
+  2:   # STRONG PRIORITY
+    [D2L, BenchSci, Jobber, Sierra Wireless, Manulife,
+     Affirm, Brex, Ramp, Wealthsimple, CrowdStrike, Palo Alto Networks, Okta,
+     Zscaler, Wiz, SentinelOne, Snyk, Rubrik, Splunk, HashiCorp, Elastic,
+     Fastly, Akamai Technologies, Red Hat, Oracle, IBM, Cisco, AMD, Intel,
+     Qualcomm, Arm, Broadcom, Autodesk, SAP, Dropbox, Twilio, Postman, Vercel,
+     Cockroach Labs, PagerDuty, Sentry, Canva, Asana, Samsara, The Trade Desk,
+     Pinterest, Reddit, Roblox, TikTok, Scale AI, Glean, Cohere, Perplexity,
+     1Password, GitLab, Workday]
+  3:   # STILL WORTH TRACKING
+    [Kabam, Blackbird Interactive,
+     Snap, Spotify, Instacart, Etsy, eBay, Expedia Group, Walmart Global Tech,
+     Electronic Arts, Riot Games, Unity, Epic Games, Adyen, Wise, Chime, SoFi,
+     Marqeta, Revolut, Klarna, Circle Internet Financial, Mercury, RBC, TD,
+     CIBC, BMO, Scotiabank, CPP Investments, OTPP, Thomson Reuters, Clio,
+     StackAdapt, Global Relay, Arctic Wolf, Fortinet, Nasdaq, CME Group,
+     American Express, Bank of America, Citi, Fidelity Investments,
+     Charles Schwab, DRW, SIG, Akuna Capital, Tower Research Capital,
+     Virtu Financial, DigitalOcean]
+
+# ---------------------------------------------------------------------------
+# WATCHLIST — resolve with `jobhunt discover`. Obvious duplicate aliases have
+# been collapsed to one canonical entry (e.g. AWS -> Amazon, BMO/Bank of
+# Montreal -> BMO, RBC/Royal Bank of Canada -> RBC).
+# ---------------------------------------------------------------------------
+companies:
+  - name: 1Password
+  - name: ACI Worldwide
+  - name: Adobe
+  - name: Adyen
+  - name: Affirm
+  - name: Afterpay
+  - name: Airbnb
+  - name: Akamai Technologies
+  - name: Akuna Capital
+  - name: Algolia
+  - name: Amazon            # covers AWS / Amazon Web Services (amazon.jobs)
+  - name: AMD
+  - name: American Express
+  - name: Apple
+  - name: Applied Intuition
+  - name: Arctic Wolf
+  - name: Arista Networks
+  - name: Arm
+  - name: Asana
+  - name: Atlassian
+  - name: Audible
+  - name: Aurora Innovation
+  - name: Autodesk
+  - name: Avalara
+  - name: Bank of America
+  - name: BMO               # Bank of Montreal
+  - name: Barclays
+  - name: Bell Canada
+  - name: Benevity
+  - name: Betterment
+  - name: BitGo
+  - name: BlackBerry
+  - name: BlackLine
+  - name: BlackRock
+  - name: Block             # parent of Square / Cash App / Afterpay
+  - name: Bloomberg
+  - name: Bolt Financial
+  - name: Box
+  - name: Braze
+  - name: Brex
+  - name: Broadcom
+  - name: Broadridge
+  - name: Bugcrowd
+  - name: Cadence Design Systems
+  - name: Canva
+  - name: Capital One
+  - name: Carta
+  - name: Cash App
+  - name: Cboe Global Markets
+  - name: Charles Schwab
+  - name: Check Point Software
+  - name: Chime
+  - name: CIBC              # Canadian Imperial Bank of Commerce
+  - name: Ciena
+  - name: Circle Internet Financial
+  - name: Cisco
+  - name: Citadel
+  - name: Citadel Securities
+  - name: Citi              # Citigroup
+  - name: Clio
+  - name: Cloudflare
+  - name: Cloudinary
+  - name: Cockroach Labs
+  - name: Cohere
+  - name: Coinbase
+  - name: Comcast
+  - name: Confluent
+  - name: Coupang
+  - name: CPP Investments
+  - name: Credit Karma
+  - name: CrowdStrike
+  - name: CyberArk
+  - name: D. E. Shaw
+  - name: Databricks
+  - name: Datadog
+  - name: Dataminr
+  - name: Dayforce
+  - name: Dell Technologies
+  - name: Dialpad
+  - name: DigitalOcean
+  - name: Disney
+  - name: DocuSign
+  - name: DoorDash
+  - name: Dropbox
+  - name: DRW
+  - name: DTCC
+  - name: Dynatrace
+  - name: eBay
+  - name: Elastic
+  - name: Electronic Arts
+  - name: Epic Games
+  - name: Equifax
+  - name: Ericsson
+  - name: Etsy
+  - name: Expedia Group
+  - name: FactSet
+  - name: Faire
+  - name: Fastly
+  - name: Fidelity Investments
+  - name: Figma
+  - name: FIS
+  - name: Fiserv
+  - name: Fortinet
+  - name: FreshBooks
+  - name: Freshworks
+  - name: Geotab
+  - name: GitHub
+  - name: GitLab
+  - name: Glean
+  - name: Global Payments
+  - name: Global Relay
+  - name: Goldman Sachs
+  - name: Google            # covers Alphabet / YouTube
+  - name: Grammarly
+  - name: HackerOne
+  - name: Harvey AI
+  - name: HashiCorp
+  - name: HPE               # Hewlett Packard Enterprise
+  - name: Hootsuite
+  - name: Hopper
+  - name: HP
+  - name: Huawei Canada
+  - name: HubSpot
+  - name: Hudson River Trading
+  - name: IBM
+  - name: IMC Trading
+  - name: Indeed
+  - name: Instacart
+  - name: Intact Financial
+  - name: Intel
+  - name: ICE               # Intercontinental Exchange
+  - name: Intuit
+  - name: Jamf
+  - name: Jane Street
+  - name: JPMorgan Chase
+  - name: Jump Trading
+  - name: Kinaxis
+  - name: Klarna
+  - name: Klaviyo
+  - name: Later
+  - name: Lightspeed Commerce
+  - name: LinkedIn
+  - name: LiveRamp
+  - name: LSEG              # London Stock Exchange Group
+  - name: Lucid Software
+  - name: Lyft
+  - name: Manulife
+  - name: Marqeta
+  - name: Mastercard
+  - name: MathWorks
+  - name: Mercury
+  - name: Meta
+  - name: Microsoft
+  - name: Millennium Management
+  - name: Miro
+  - name: monday.com
+  - name: MongoDB
+  - name: Moody's
+  - name: Morgan Stanley
+  - name: Morningstar
+  - name: Motive Technologies
+  - name: Motorola Solutions
+  - name: MSCI
+  - name: MuleSoft
+  - name: Nasdaq
+  - name: National Bank of Canada
+  - name: Neo Financial
+  - name: NetApp
+  - name: Netflix
+  - name: NetSuite
+  - name: New Relic
+  - name: Nokia
+  - name: Notion
+  - name: Nutanix
+  - name: Nuvei
+  - name: NVIDIA
+  - name: Okta
+  - name: OMERS
+  - name: OTPP              # Ontario Teachers' Pension Plan
+  - name: OpenTable
+  - name: OpenText
+  - name: Optiver
+  - name: Oracle
+  - name: PagerDuty
+  - name: Palantir
+  - name: Palo Alto Networks
+  - name: PayPal
+  - name: Perplexity
+  - name: Pinterest
+  - name: Plaid
+  - name: Point72
+  - name: PointClickCare
+  - name: Postman
+  - name: Procore
+  - name: Progressive Insurance
+  - name: Proofpoint
+  - name: Pure Storage
+  - name: Qualcomm
+  - name: Qualtrics
+  - name: Questrade
+  - name: Ramp
+  - name: Rapid7
+  - name: RBC               # Royal Bank of Canada
+  - name: Red Hat
+  - name: Reddit
+  - name: Remitly
+  - name: Revolut
+  - name: Riot Games
+  - name: Ripple
+  - name: Rippling
+  - name: Rivian
+  - name: Robinhood
+  - name: Roblox
+  - name: Rogers Communications
+  - name: Roku
+  - name: Rubrik
+  - name: S&P Global
+  - name: SailPoint
+  - name: Salesforce
+  - name: Samsara
+  - name: Samsung
+  - name: SAP
+  - name: Scale AI
+  - name: Scotiabank
+  - name: SentinelOne
+  - name: Sentry
+  - name: ServiceNow
+  - name: Shopify
+  - name: Slack
+  - name: Smartsheet
+  - name: Snap
+  - name: Snowflake
+  - name: Snyk
+  - name: SoFi
+  - name: Splunk
+  - name: Spotify
+  - name: Square
+  - name: StackAdapt
+  - name: State Street
+  - name: Stripe
+  - name: Sun Life
+  - name: SIG               # Susquehanna International Group
+  - name: Synopsys
+  - name: Tableau
+  - name: TD                # TD Bank / Toronto-Dominion Bank
+  - name: TELUS
+  - name: Tenable
+  - name: Tenstorrent
+  - name: Tesla
+  - name: The Trade Desk
+  - name: Thomson Reuters
+  - name: TikTok
+  - name: TMX Group
+  - name: Toast
+  - name: Tower Research Capital
+  - name: Trend Micro
+  - name: Twilio
+  - name: Twitch
+  - name: Two Sigma
+  - name: Uber
+  - name: UBS
+  - name: Unity
+  - name: Vanguard
+  - name: Vanta
+  - name: Veeam
+  - name: Verafin
+  - name: Vercel
+  - name: Verizon
+  - name: Verkada
+  - name: Virtu Financial
+  - name: Visa
+  - name: VMware
+  - name: Walmart Global Tech
+  - name: Wayfair
+  - name: Wealthsimple
+  - name: Wells Fargo
+  - name: Wise
+  - name: Wiz
+  - name: Workday
+  - name: Workiva
+  - name: Xero
+  - name: Yelp
+  - name: Zendesk
+  - name: Zoom
+  - name: ZoomInfo
+  - name: Zscaler
