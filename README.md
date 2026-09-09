@@ -14,10 +14,6 @@ So to find internships the moment they're released + filter out all the irreleva
 
 It's been running unattended on a small cloud box since July 2026.
 
-- **Scanner** — on a schedule, pull new postings from a watchlist of companies' first-party ATS endpoints, keep the ones matching my criteria, rank them, and notify me on Discord. Only ever notifies once per posting.
-
-This is a personal tool built for low-friction reliability, not scale or polish. It's public so others can read it, fork it, and point it at their own watchlist.
-
 ---
 
 ## In practice
