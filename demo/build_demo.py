@@ -133,21 +133,19 @@ def render(rows: list[sqlite3.Row]) -> str:
   <nav class="sidebar">
     <h2>Job alerts</h2>
     <div class="chan active"># internship-alerts</div>
-    <div class="chan"># heartbeat</div>
   </nav>
   <div class="main">
     <header><span class="hash">#</span> internship-alerts</header>
     <div class="feed">
       <div class="notice">
         <b>Demo snapshot — last updated {SNAPSHOT_DATE}.</b><br>
-        These are real alerts produced by <a href="https://github.com/avi-kwok/jobhunt">jobhunt</a>,
-        one per company, newest first. Job postings expire, so some links may no longer resolve.
+        Real alerts previously sent by <a href="https://github.com/avi-kwok/jobhunt">jobhunt</a> to my discord server via webhooks.
+        Links are routed to the actual job posting, but some links may no longer resolve due to job postings expiring. Heartbeat not included.
       </div>
       {"".join(cards)}
     </div>
     <footer>
       Showing {len(rows)} of 136 alerts sent between July 2 and September 9, 2026 &middot;
-      one per company so no single board dominates &middot;
       <a href="https://github.com/avi-kwok/jobhunt">source on GitHub</a>
     </footer>
   </div>
