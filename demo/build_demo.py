@@ -16,7 +16,8 @@ import sqlite3
 from datetime import datetime
 from pathlib import Path
 
-SNAPSHOT_DATE = "September 12, 2026"
+# Derived at build time so a regenerated page is never stale-dated.
+SNAPSHOT_DATE = datetime.now().strftime("%B %-d, %Y")
 
 # Embed accent by score band — mirrors how the Discord notifier colours them.
 def accent(score: int) -> str:
@@ -30,6 +31,18 @@ def accent(score: int) -> str:
 
 
 TIERS = {1: "Vancouver / Toronto", 2: "US metro", 3: "Rest of Canada", 4: "Remote", 5: "Other"}
+
+
+def totals(db: Path) -> dict[str, str]:
+    """Corpus-wide figures for the footer, so they can't drift from the data."""
+    con = sqlite3.connect(f"file:{db}?mode=ro", uri=True)
+    n, lo, hi = con.execute(
+        "SELECT SUM(notified), MIN(date(first_seen)), MAX(date(first_seen)) "
+        "FROM seen_jobs WHERE notified = 1"
+    ).fetchone()
+    con.close()
+    fmt = lambda d: datetime.fromisoformat(d).strftime("%B %-d, %Y")
+    return {"count": str(n), "start": fmt(lo), "end": fmt(hi)}
 
 
 def fetch(db: Path, limit: int) -> list[sqlite3.Row]:
@@ -60,7 +73,7 @@ def stamp(iso: str) -> str:
     return dt.strftime("%b %-d, %Y at %-I:%M %p")
 
 
-def render(rows: list[sqlite3.Row]) -> str:
+def render(rows: list[sqlite3.Row], tot: dict[str, str]) -> str:
     e = html.escape
     cards = []
     for r in rows:
@@ -145,7 +158,7 @@ def render(rows: list[sqlite3.Row]) -> str:
       {"".join(cards)}
     </div>
     <footer>
-      Showing {len(rows)} of 136 alerts sent between July 2 and September 9, 2026 &middot;
+      Showing {len(rows)} of {tot["count"]} alerts sent between {tot["start"]} and {tot["end"]} &middot;
       <a href="https://github.com/avi-kwok/jobhunt">source on GitHub</a>
     </footer>
   </div>
@@ -162,7 +175,7 @@ def main() -> None:
 
     rows = fetch(a.db, a.limit)
     a.out.parent.mkdir(parents=True, exist_ok=True)
-    a.out.write_text(render(rows), encoding="utf-8")
+    a.out.write_text(render(rows, totals(a.db)), encoding="utf-8")
     print(f"wrote {a.out} ({len(rows)} alerts)")
 
 
